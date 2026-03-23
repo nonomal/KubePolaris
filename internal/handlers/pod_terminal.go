@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,9 +14,11 @@ import (
 	"time"
 
 	"github.com/clay-wangzhi/KubePolaris/internal/k8s"
+	"github.com/clay-wangzhi/KubePolaris/internal/middleware"
+	"github.com/clay-wangzhi/KubePolaris/internal/models"
+	"github.com/clay-wangzhi/KubePolaris/internal/response"
 	"github.com/clay-wangzhi/KubePolaris/internal/services"
 	"github.com/clay-wangzhi/KubePolaris/pkg/logger"
-
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -79,7 +82,11 @@ func NewPodTerminalHandler(clusterService *services.ClusterService, auditService
 		k8sMgr:         k8sMgr,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // 在生产环境中应该检查Origin
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true
+				}
+				return middleware.IsOriginAllowed(origin)
 			},
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -100,25 +107,43 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 	// 获取集群信息
 	clusterIDUint, err := strconv.ParseUint(clusterID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的集群ID"})
+		response.BadRequest(c, "无效的集群ID")
 		return
 	}
 
 	cluster, err := h.clusterService.GetCluster(uint(clusterIDUint))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "集群不存在"})
+		response.NotFound(c, "集群不存在")
 		return
 	}
 
-	// 创建审计会话
+	terminalType := services.TerminalTypePod
+	if t, exists := c.Get("terminal_type"); exists && t == "kubectl" {
+		terminalType = services.TerminalTypeKubectl
+	}
+
+	// 升级到WebSocket连接
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	h.RunPodTerminalWithConn(conn, cluster, clusterID, namespace, podName, container, userID, terminalType)
+}
+
+// RunPodTerminalWithConn 在已建立的 WebSocket 上运行 Pod 终端（kubectl Pod 终端等场景先推送进度再复用此逻辑）
+func (h *PodTerminalHandler) RunPodTerminalWithConn(
+	conn *websocket.Conn,
+	cluster *models.Cluster,
+	clusterIDStr, namespace, podName, container string,
+	userID uint,
+	terminalType services.TerminalType,
+) {
 	var auditSessionID uint
 	if h.auditService != nil {
-		// 检查是否是 kubectl 模式（由 kubectl_pod_terminal 设置）
-		terminalType := services.TerminalTypePod
-		if t, exists := c.Get("terminal_type"); exists && t == "kubectl" {
-			terminalType = services.TerminalTypeKubectl
-		}
-
 		auditSession, err := h.auditService.CreateSession(&services.CreateSessionRequest{
 			UserID:     userID,
 			ClusterID:  cluster.ID,
@@ -134,27 +159,13 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 		}
 	}
 
-	// 升级到WebSocket连接
-	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		// 关闭审计会话
-		if h.auditService != nil && auditSessionID > 0 {
-			_ = h.auditService.CloseSession(auditSessionID, "error")
-		}
-		return
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	// 创建会话
-	sessionID := fmt.Sprintf("%s-%s-%s-%d", clusterID, namespace, podName, time.Now().Unix())
+	sessionID := fmt.Sprintf("%s-%s-%s-%d", clusterIDStr, namespace, podName, time.Now().Unix())
 	ctx, cancel := context.WithCancel(context.Background())
 
 	session := &PodTerminalSession{
 		ID:             sessionID,
 		AuditSessionID: auditSessionID,
-		ClusterID:      clusterID,
+		ClusterID:      clusterIDStr,
 		Namespace:      namespace,
 		PodName:        podName,
 		Container:      container,
@@ -163,25 +174,21 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 		Cancel:         cancel,
 	}
 
-	// 注册会话
 	h.sessionsMutex.Lock()
 	h.sessions[sessionID] = session
 	h.sessionsMutex.Unlock()
 
-	// 清理会话
 	defer func() {
 		h.sessionsMutex.Lock()
 		delete(h.sessions, sessionID)
 		h.sessionsMutex.Unlock()
 		cancel()
 		h.closeSession(session)
-		// 关闭审计会话
 		if h.auditService != nil && auditSessionID > 0 {
 			_ = h.auditService.CloseSession(auditSessionID, "closed")
 		}
 	}()
 
-	// 获取缓存的 K8s 客户端
 	k8sClient, err := h.k8sMgr.GetK8sClient(cluster)
 	if err != nil {
 		h.sendMessage(conn, "error", fmt.Sprintf("获取K8s客户端失败: %v", err))
@@ -190,27 +197,23 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 	client := k8sClient.GetClientset()
 	k8sConfig := k8sClient.GetRestConfig()
 
-	// 查找可用的shell
 	shell, err := h.findAvailableShell(client, k8sConfig, session)
 	if err != nil {
 		h.sendMessage(conn, "error", fmt.Sprintf("未找到可用的shell: %v", err))
 		return
 	}
 
-	// 启动Pod终端连接
 	if err := h.startPodTerminal(client, k8sConfig, session, shell); err != nil {
 		h.sendMessage(conn, "error", fmt.Sprintf("启动Pod终端失败: %v", err))
 		return
 	}
 
-	// 发送连接成功消息
 	containerInfo := ""
 	if container != "" {
 		containerInfo = fmt.Sprintf(" (container: %s)", container)
 	}
 	h.sendMessage(conn, "connected", fmt.Sprintf("Connected to pod %s/%s%s using %s", namespace, podName, containerInfo, shell))
 
-	// 处理WebSocket消息
 	for {
 		mt, data, err := conn.ReadMessage()
 		if err != nil {
@@ -220,7 +223,6 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 			continue
 		}
 
-		// 优先尝试按JSON解析
 		var msg PodTerminalMessage
 		if err := json.Unmarshal(data, &msg); err == nil && msg.Type != "" {
 			switch msg.Type {
@@ -232,7 +234,6 @@ func (h *PodTerminalHandler) HandlePodTerminal(c *gin.Context) {
 			continue
 		}
 
-		// 兼容纯文本：直接作为输入
 		h.handleInput(session, string(data))
 	}
 }
@@ -271,8 +272,11 @@ func (h *PodTerminalHandler) hasShellInContainer(client *kubernetes.Clientset, k
 		return false
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	var buf bytes.Buffer
-	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: &buf,
 		Tty:    false,
 	})
@@ -381,6 +385,12 @@ func (h *PodTerminalHandler) handleInput(session *PodTerminalSession, input stri
 // handleResize 处理终端大小调整
 func (h *PodTerminalHandler) handleResize(session *PodTerminalSession, cols, rows int) {
 	if session.winSizeChan != nil {
+		if cols < 0 || cols > math.MaxUint16 {
+			cols = 80
+		}
+		if rows < 0 || rows > math.MaxUint16 {
+			rows = 24
+		}
 		size := &remotecommand.TerminalSize{
 			Width:  uint16(cols),
 			Height: uint16(rows),

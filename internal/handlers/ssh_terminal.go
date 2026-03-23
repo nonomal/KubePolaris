@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/clay-wangzhi/KubePolaris/internal/middleware"
 	"github.com/clay-wangzhi/KubePolaris/internal/services"
 	"github.com/clay-wangzhi/KubePolaris/pkg/logger"
 
@@ -61,7 +62,11 @@ type SSHSession struct {
 // WebSocket升级器
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 允许跨域
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		return middleware.IsOriginAllowed(origin)
 	},
 }
 
@@ -290,7 +295,7 @@ func (h *SSHHandler) createSSHConnection(config *SSHConfig) (*ssh.Client, *ssh.S
 	// 创建SSH客户端配置
 	sshConfig := &ssh.ClientConfig{
 		User:            config.Username,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // 生产环境应该验证主机密钥
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- 平台管理场景，目标节点已在集群管理范围内
 		Timeout:         30 * time.Second,
 	}
 

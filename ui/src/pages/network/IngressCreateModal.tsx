@@ -126,23 +126,18 @@ spec:
     try {
       if (activeTab === 'yaml') {
         // YAML方式创建
-        const response = await IngressService.createIngress(clusterId, {
-          namespace: 'default', // 从YAML中解析
+        await IngressService.createIngress(clusterId, {
+          namespace: 'default',
           yaml: yamlContent,
         });
         
-        if (response.code === 200) {
-          message.success(t('network:create.ingressSuccess'));
-          onSuccess();
-          onClose();
-        } else {
-          message.error(response.message || t('network:create.ingressFailed'));
-        }
+        message.success(t('network:create.ingressSuccess'));
+        onSuccess();
+        onClose();
       } else {
-        // 表单方式创建
         const values = await form.validateFields();
         
-        const response = await IngressService.createIngress(clusterId, {
+        await IngressService.createIngress(clusterId, {
           namespace: values.namespace,
           formData: {
             name: values.name,
@@ -171,14 +166,10 @@ spec:
           },
         });
         
-        if (response.code === 200) {
-          message.success(t('network:create.ingressSuccess'));
-          form.resetFields();
-          onSuccess();
-          onClose();
-        } else {
-          message.error(response.message || t('network:create.ingressFailed'));
-        }
+        message.success(t('network:create.ingressSuccess'));
+        form.resetFields();
+        onSuccess();
+        onClose();
       }
     } catch (error: unknown) {
       console.error('Failed to create Ingress:', error);
