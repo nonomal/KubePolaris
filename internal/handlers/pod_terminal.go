@@ -18,6 +18,7 @@ import (
 	"github.com/clay-wangzhi/KubePolaris/internal/models"
 	"github.com/clay-wangzhi/KubePolaris/internal/response"
 	"github.com/clay-wangzhi/KubePolaris/internal/services"
+	"github.com/clay-wangzhi/KubePolaris/internal/terminalreplay"
 	"github.com/clay-wangzhi/KubePolaris/pkg/logger"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,7 @@ type PodTerminalHandler struct {
 	clusterService *services.ClusterService
 	auditService   *services.AuditService
 	k8sMgr         *k8s.ClusterInformerManager
+	replayDir      string // 空表示不录像
 	upgrader       websocket.Upgrader
 	sessions       map[string]*PodTerminalSession
 	sessionsMutex  sync.RWMutex
@@ -64,6 +66,8 @@ type PodTerminalSession struct {
 	stdoutWriter io.WriteCloser
 	winSizeChan  chan *remotecommand.TerminalSize
 	done         chan struct{}
+
+	replay *terminalreplay.Recorder
 }
 
 // PodTerminalMessage Pod终端消息
@@ -74,12 +78,13 @@ type PodTerminalMessage struct {
 	Rows int    `json:"rows,omitempty"`
 }
 
-// NewPodTerminalHandler 创建Pod终端处理器
-func NewPodTerminalHandler(clusterService *services.ClusterService, auditService *services.AuditService, k8sMgr *k8s.ClusterInformerManager) *PodTerminalHandler {
+// NewPodTerminalHandler 创建Pod终端处理器。replayDir 为空表示不写入会话录像。
+func NewPodTerminalHandler(clusterService *services.ClusterService, auditService *services.AuditService, k8sMgr *k8s.ClusterInformerManager, replayDir string) *PodTerminalHandler {
 	return &PodTerminalHandler{
 		clusterService: clusterService,
 		auditService:   auditService,
 		k8sMgr:         k8sMgr,
+		replayDir:      replayDir,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
@@ -174,6 +179,15 @@ func (h *PodTerminalHandler) RunPodTerminalWithConn(
 		Cancel:         cancel,
 	}
 
+	if h.auditService != nil && auditSessionID > 0 {
+		rec, err := terminalreplay.NewRecorder(h.replayDir, h.auditService, auditSessionID, 120, 30)
+		if err != nil {
+			logger.Error("创建会话录像失败", "error", err)
+		} else {
+			session.replay = rec
+		}
+	}
+
 	h.sessionsMutex.Lock()
 	h.sessions[sessionID] = session
 	h.sessionsMutex.Unlock()
@@ -183,6 +197,9 @@ func (h *PodTerminalHandler) RunPodTerminalWithConn(
 		delete(h.sessions, sessionID)
 		h.sessionsMutex.Unlock()
 		cancel()
+		if session.replay != nil {
+			session.replay.End()
+		}
 		h.closeSession(session)
 		if h.auditService != nil && auditSessionID > 0 {
 			_ = h.auditService.CloseSession(auditSessionID, "closed")
@@ -399,6 +416,9 @@ func (h *PodTerminalHandler) handleResize(session *PodTerminalSession, cols, row
 		case session.winSizeChan <- size:
 		case <-session.done:
 		}
+		if session.replay != nil {
+			session.replay.Resize(cols, rows)
+		}
 	}
 }
 
@@ -414,6 +434,9 @@ func (h *PodTerminalHandler) readOutput(session *PodTerminalSession) {
 		if n > 0 {
 			output := string(buffer[:n])
 			h.sendMessage(session.Conn, "data", output)
+			if session.replay != nil {
+				session.replay.Record(buffer[:n])
+			}
 
 			// 追踪终端输出，用于提取完整命令（包括Tab补全结果）
 			if h.auditService != nil && session.AuditSessionID > 0 {

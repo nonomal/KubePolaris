@@ -1,7 +1,12 @@
 package handlers
 
 import (
+	"compress/gzip"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -86,6 +91,56 @@ func (h *AuditHandler) GetTerminalSessions(c *gin.Context) {
 	}
 
 	response.OK(c, resp)
+}
+
+// GetTerminalSessionReplay 下载会话录像（asciicast v2，gzip 解压后以 application/x-asciicast 返回）
+func (h *AuditHandler) GetTerminalSessionReplay(c *gin.Context) {
+	sessionIDStr := c.Param("sessionId")
+	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 32)
+	if err != nil {
+		response.BadRequest(c, "无效的会话ID")
+		return
+	}
+
+	detail, err := h.auditService.GetSessionDetail(uint(sessionID))
+	if err != nil {
+		response.NotFound(c, "会话不存在")
+		return
+	}
+	if detail.ReplayPath == "" || detail.ReplaySize <= 0 {
+		response.NotFound(c, "该会话无可用录像")
+		return
+	}
+
+	root := filepath.Clean(h.cfg.Terminal.ReplayDir)
+	if strings.Contains(detail.ReplayPath, "..") || filepath.IsAbs(detail.ReplayPath) {
+		response.BadRequest(c, "无效的录像路径")
+		return
+	}
+	full := filepath.Clean(filepath.Join(root, filepath.FromSlash(detail.ReplayPath)))
+	if rel, err := filepath.Rel(root, full); err != nil || strings.HasPrefix(rel, "..") {
+		response.BadRequest(c, "无效的录像路径")
+		return
+	}
+
+	f, err := os.Open(full)
+	if err != nil {
+		response.NotFound(c, "录像文件不存在")
+		return
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		response.InternalError(c, "读取录像失败: "+err.Error())
+		return
+	}
+	defer gzr.Close()
+
+	c.Header("Content-Type", "application/x-asciicast")
+	c.Header("Cache-Control", "private, max-age=3600")
+	c.Status(200)
+	_, _ = io.Copy(c.Writer, gzr)
 }
 
 // GetTerminalSession 获取终端会话详情

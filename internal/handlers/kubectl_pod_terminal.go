@@ -39,6 +39,7 @@ type KubectlPodTerminalHandler struct {
 	clusterService *services.ClusterService
 	auditService   *services.AuditService
 	k8sMgr         *k8s.ClusterInformerManager
+	replayDir      string
 	podTerminal    *PodTerminalHandler
 	activeSessions map[string]int // podName -> activeConnections
 	sessionsMutex  sync.RWMutex
@@ -46,12 +47,13 @@ type KubectlPodTerminalHandler struct {
 }
 
 // NewKubectlPodTerminalHandler 创建 kubectl Pod 终端处理器
-func NewKubectlPodTerminalHandler(clusterService *services.ClusterService, auditService *services.AuditService, k8sMgr *k8s.ClusterInformerManager) *KubectlPodTerminalHandler {
+func NewKubectlPodTerminalHandler(clusterService *services.ClusterService, auditService *services.AuditService, k8sMgr *k8s.ClusterInformerManager, replayDir string) *KubectlPodTerminalHandler {
 	h := &KubectlPodTerminalHandler{
 		clusterService: clusterService,
 		auditService:   auditService,
 		k8sMgr:         k8sMgr,
-		podTerminal:    NewPodTerminalHandler(clusterService, auditService, k8sMgr),
+		replayDir:      replayDir,
+		podTerminal:    NewPodTerminalHandler(clusterService, auditService, k8sMgr, replayDir),
 		activeSessions: make(map[string]int),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {

@@ -44,6 +44,7 @@ import type {
   SessionStats,
   SessionListParams,
 } from '../../services/auditService';
+import { useNavigate } from 'react-router-dom';
 
 const { RangePicker } = DatePicker;
 const { Text, Paragraph } = Typography;
@@ -63,6 +64,7 @@ const statusConfig: Record<string, { label: string; status: 'processing' | 'succ
 };
 
 const CommandHistory: React.FC = () => {
+  const navigate = useNavigate();
   const { message } = App.useApp();
 
   // 数据状态
@@ -267,17 +269,28 @@ const [sessions, setSessions] = useState<TerminalSessionItem[]>([]);
     {
       title: t('common:table.actions'),
       key: 'action',
-      width: 100,
+      width: 160,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<HistoryOutlined />}
-          onClick={() => handleViewCommands(record)}
-        >
-          {t('audit:commands.viewBtn')}
-        </Button>
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            icon={<HistoryOutlined />}
+            onClick={() => handleViewCommands(record)}
+          >
+            {t('audit:commands.viewBtn')}
+          </Button>
+          {record.replay_size > 0 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => navigate(`/audit/terminal/replay/${record.id}`)}
+            >
+              回放
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];

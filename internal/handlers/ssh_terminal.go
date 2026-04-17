@@ -11,6 +11,7 @@ import (
 
 	"github.com/clay-wangzhi/KubePolaris/internal/middleware"
 	"github.com/clay-wangzhi/KubePolaris/internal/services"
+	"github.com/clay-wangzhi/KubePolaris/internal/terminalreplay"
 	"github.com/clay-wangzhi/KubePolaris/pkg/logger"
 
 	"github.com/gin-gonic/gin"
@@ -21,12 +22,14 @@ import (
 // SSHHandler SSH终端处理器
 type SSHHandler struct {
 	auditService *services.AuditService
+	replayDir    string
 }
 
 // NewSSHHandler 创建SSH处理器
-func NewSSHHandler(auditService *services.AuditService) *SSHHandler {
+func NewSSHHandler(auditService *services.AuditService, replayDir string) *SSHHandler {
 	return &SSHHandler{
 		auditService: auditService,
+		replayDir:    replayDir,
 	}
 }
 
@@ -54,6 +57,7 @@ type SSHMessage struct {
 // SSHSession SSH会话信息
 type SSHSession struct {
 	auditSessionID   uint
+	replay           *terminalreplay.Recorder
 	currentLine      strings.Builder // 当前行的输出内容
 	lastCompleteLine string          // 上一个完整行
 	pendingEnter     bool            // 是否有待处理的回车键
@@ -101,6 +105,9 @@ func (h *SSHHandler) SSHConnect(c *gin.Context) {
 		if sshClient != nil {
 			_ = sshClient.Close()
 		}
+		if sessionInfo != nil && sessionInfo.replay != nil {
+			sessionInfo.replay.End()
+		}
 		// 关闭审计会话
 		if sessionInfo != nil && sessionInfo.auditSessionID > 0 && h.auditService != nil {
 			_ = h.auditService.CloseSession(sessionInfo.auditSessionID, "closed")
@@ -135,6 +142,11 @@ func (h *SSHHandler) SSHConnect(c *gin.Context) {
 					logger.Error("创建审计会话失败", "error", err)
 				} else {
 					sessionInfo.auditSessionID = auditSession.ID
+					if rec, err := terminalreplay.NewRecorder(h.replayDir, h.auditService, auditSession.ID, 80, 24); err != nil {
+						logger.Error("SSH 会话录像创建失败", "error", err)
+					} else {
+						sessionInfo.replay = rec
+					}
 				}
 			}
 
@@ -142,6 +154,9 @@ func (h *SSHHandler) SSHConnect(c *gin.Context) {
 			sshClient, sshSession, stdin, stdout, stderr, err = h.createSSHConnection(msg.Config)
 			if err != nil {
 				h.sendError(conn, fmt.Sprintf("SSH连接失败: %v", err))
+				if sessionInfo != nil && sessionInfo.replay != nil {
+					sessionInfo.replay.End()
+				}
 				if sessionInfo != nil && sessionInfo.auditSessionID > 0 && h.auditService != nil {
 					_ = h.auditService.CloseSession(sessionInfo.auditSessionID, "error")
 				}
@@ -182,6 +197,9 @@ func (h *SSHHandler) SSHConnect(c *gin.Context) {
 				err := sshSession.WindowChange(msg.Rows, msg.Cols)
 				if err != nil {
 					logger.Error("调整终端大小失败", "error", err)
+				}
+				if sessionInfo != nil && sessionInfo.replay != nil {
+					sessionInfo.replay.Resize(msg.Cols, msg.Rows)
 				}
 			}
 		}
@@ -414,6 +432,9 @@ func (h *SSHHandler) readSSHOutput(conn *websocket.Conn, stdout, stderr io.Reade
 					logger.Error("发送SSH输出失败", "error", err)
 					break
 				}
+				if session != nil && session.replay != nil {
+					session.replay.Record(buffer[:n])
+				}
 
 				// 追踪输出以提取命令
 				if session != nil && h.auditService != nil && session.auditSessionID > 0 {
@@ -443,6 +464,9 @@ func (h *SSHHandler) readSSHOutput(conn *websocket.Conn, stdout, stderr io.Reade
 				if err != nil {
 					logger.Error("发送SSH错误输出失败", "error", err)
 					break
+				}
+				if session != nil && session.replay != nil {
+					session.replay.Record(buffer[:n])
 				}
 			}
 		}

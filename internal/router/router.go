@@ -508,6 +508,7 @@ func Setup(db *gorm.DB, cfg *config.Config, frontendFS embed.FS) (*gin.Engine, *
 			terminalAuditHandler := handlers.NewAuditHandler(db, cfg)
 			audit.GET("/terminal/sessions", terminalAuditHandler.GetTerminalSessions)
 			audit.GET("/terminal/sessions/:sessionId", terminalAuditHandler.GetTerminalSession)
+			audit.GET("/terminal/sessions/:sessionId/replay", terminalAuditHandler.GetTerminalSessionReplay)
 			audit.GET("/terminal/sessions/:sessionId/commands", terminalAuditHandler.GetTerminalCommands)
 			audit.GET("/terminal/stats", terminalAuditHandler.GetTerminalStats)
 
@@ -620,10 +621,11 @@ func Setup(db *gorm.DB, cfg *config.Config, frontendFS embed.FS) (*gin.Engine, *
 	ws.Use(middleware.AuthRequired(cfg.JWT.Secret))
 	{
 		// 终端处理器（注入审计服务）
+		replayDir := cfg.Terminal.ReplayDir
 		kctl := handlers.NewKubectlTerminalHandler(clusterSvc, auditSvc)
-		ssh := handlers.NewSSHHandler(auditSvc)
-		podTerminal := handlers.NewPodTerminalHandler(clusterSvc, auditSvc, k8sMgr)
-		kubectlPod := handlers.NewKubectlPodTerminalHandler(clusterSvc, auditSvc, k8sMgr)
+		ssh := handlers.NewSSHHandler(auditSvc, replayDir)
+		podTerminal := handlers.NewPodTerminalHandler(clusterSvc, auditSvc, k8sMgr, replayDir)
+		kubectlPod := handlers.NewKubectlPodTerminalHandler(clusterSvc, auditSvc, k8sMgr, replayDir)
 		podHandler := handlers.NewPodHandler(db, cfg, clusterSvc, k8sMgr)
 		logCenterHandler := handlers.NewLogCenterHandler(clusterSvc, k8sMgr)
 

@@ -39,7 +39,7 @@ import SystemSettings from './pages/settings/SystemSettings';
 import UserProfile from './pages/profile/UserProfile';
 import Overview from './pages/overview/Overview';
 import { AlertCenter, GlobalAlertCenter } from './pages/alert';
-import { CommandHistory, OperationLogs } from './pages/audit';
+import { CommandHistory, OperationLogs, TerminalReplay } from './pages/audit';
 import { LogCenter, EventLogs } from './pages/logs';
 import ArgoCDConfigPage from './pages/plugins/ArgoCDConfigPage';
 import ArgoCDApplicationsPage from './pages/plugins/ArgoCDApplicationsPage';
@@ -197,6 +197,11 @@ const AppContent: React.FC = () => {
               <Route path="audit/commands" element={
                 <PermissionGuard platformAdminOnly>
                   <CommandHistory />
+                </PermissionGuard>
+              } />
+              <Route path="audit/terminal/replay/:sessionId" element={
+                <PermissionGuard platformAdminOnly>
+                  <TerminalReplay />
                 </PermissionGuard>
               } />
               {/* 访问控制路由 - 仅平台管理员 */}
