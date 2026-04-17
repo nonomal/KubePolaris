@@ -12,7 +12,14 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	Log      LogConfig      `mapstructure:"log"`
-	K8s K8sConfig `mapstructure:"k8s"`
+	K8s      K8sConfig      `mapstructure:"k8s"`
+	Terminal TerminalConfig `mapstructure:"terminal"`
+}
+
+// TerminalConfig 终端与会话录像
+type TerminalConfig struct {
+	// ReplayDir 会话 asciicast 存储根目录（空表示禁用录像）
+	ReplayDir string `mapstructure:"replay_dir"`
 }
 
 // ServerConfig 服务器配置
@@ -86,10 +93,23 @@ func Load() *Config {
 	// 绑定 K8s 环境变量
 	_ = viper.BindEnv("k8s.default_namespace", "K8S_DEFAULT_NAMESPACE")
 
+	// 终端录像
+	_ = viper.BindEnv("terminal.replay_dir", "TERMINAL_REPLAY_DIR")
+
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		logger.Fatal("配置解析失败: %v", err)
 	}
+
+	// 安全检查：JWT Secret 默认值警告
+	if config.JWT.Secret == "kubepolaris-secret" {
+		if config.Server.Mode == "release" {
+			logger.Fatal("安全风险: 生产环境必须设置 JWT_SECRET 环境变量，不能使用默认值")
+		} else {
+			logger.Warn("安全警告: JWT_SECRET 使用默认值，请在生产环境中设置自定义密钥")
+		}
+	}
+
 	logger.Info("配置加载完成: server.port=%d, server.mode=%s, db.driver=%s, log.level=%s",
 		config.Server.Port, config.Server.Mode, config.Database.Driver, config.Log.Level)
 
@@ -121,4 +141,7 @@ func setDefaults() {
 
 	// K8s默认配置
 	viper.SetDefault("k8s.default_namespace", "default")
+
+	// 终端录像（默认开启，目录可写即可）
+	viper.SetDefault("terminal.replay_dir", "./data/terminal_replays")
 }

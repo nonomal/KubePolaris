@@ -150,14 +150,10 @@ ${rules.map(rule => `  - apiGroups: [${rule.apiGroups.map(g => `"${g}"`).join(',
       }
 
       setLoading(true);
-      const res = await rbacService.createCustomClusterRole(Number(clusterId), name, rules);
-      if (res.code === 200) {
-        message.success(t('customRoleEditor.createSuccess'));
-        onSuccess(name);
-        handleClose();
-      } else {
-        message.error(res.message || t('customRoleEditor.createFailed'));
-      }
+      await rbacService.createCustomClusterRole(Number(clusterId), name, rules);
+      message.success(t('customRoleEditor.createSuccess'));
+      onSuccess(name);
+      handleClose();
     } catch (err) {
       console.error(err);
     } finally {

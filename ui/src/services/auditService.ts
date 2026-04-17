@@ -17,6 +17,8 @@ export interface TerminalSessionItem {
   start_at: string;
   end_at: string | null;
   input_size: number;
+  replay_path?: string;
+  replay_size: number;
   status: 'active' | 'closed' | 'error';
   command_count: number;
 }
@@ -46,6 +48,8 @@ export interface SessionDetailResponse {
   start_at: string;
   end_at: string | null;
   input_size: number;
+  replay_path?: string;
+  replay_size: number;
   status: string;
   command_count: number;
   duration: string;

@@ -4,12 +4,9 @@ import {
   Card,
   Button,
   Space,
-  Select,
   message,
   Typography,
   Alert,
-  Row,
-  Col,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -22,11 +19,10 @@ import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import 'xterm/css/xterm.css';
-import { namespaceService } from '../../services/namespaceService';
+import { buildWebSocketUrl } from '../../utils/wsUrl';
 import { useTranslation } from 'react-i18next';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 
 const KubectlTerminalPage: React.FC = () => {
 const { t } = useTranslation(["terminal", "common"]);
@@ -37,42 +33,10 @@ const { id: clusterId } = useParams<{ id: string }>();
   const fitAddon = useRef<FitAddon | null>(null);
   const websocket = useRef<WebSocket | null>(null);
   
-  const [selectedNamespace, setSelectedNamespace] = useState<string>('default');
-  const [namespaces, setNamespaces] = useState<string[]>(['default', 'kube-system', 'kube-public']);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   
   const connectedRef = useRef(false);
-  const currentLineRef = useRef('');
-
-  // 加载命名空间列表
-  useEffect(() => {
-    const fetchNamespaces = async () => {
-      if (!clusterId) return;
-      
-      try {
-        const response = await namespaceService.getNamespaces(clusterId);
-        if (response.code === 200 && response.data) {
-          const names = response.data.map((ns) => ns.name).filter(Boolean);
-          if (names.length > 0) {
-            setNamespaces(names);
-            // 如果当前选中的命名空间不在新列表中，则切换到第一个
-            setSelectedNamespace((prev) => {
-              if (!names.includes(prev)) {
-                return names[0];
-              }
-              return prev;
-            });
-          }
-        }
-      } catch (error) {
-        console.error('获取命名空间列表失败:', error);
-        // 保持默认值，不显示错误提示，避免影响用户体验
-      }
-    };
-
-    fetchNamespaces();
-  }, [clusterId]);
 
   // 处理终端输入 - 直接发送所有输入到服务端（Pod Terminal 模式）
   const handleTerminalInput = useCallback((data: string) => {
@@ -123,11 +87,10 @@ const { id: clusterId } = useParams<{ id: string }>();
     terminal.current.writeln('\x1b[32m╰─────────────────────────────────────────────────────────────╯\x1b[0m');
     terminal.current.writeln('');
     terminal.current.writeln(`\x1b[36mCluster:\x1b[0m ${clusterId}`);
-    terminal.current.writeln(`\x1b[36mNamespace:\x1b[0m ${selectedNamespace}`);
     terminal.current.writeln('');
     terminal.current.writeln('\x1b[33m' + t('kubectl.welcomeMessage') + '\x1b[0m');
     terminal.current.writeln('');
-  }, [clusterId, selectedNamespace]);
+  }, [clusterId, t]);
 
   // 初始化终端
   useEffect(() => {
@@ -254,14 +217,19 @@ const { id: clusterId } = useParams<{ id: string }>();
         // 旧模式兼容
         terminal.current.write(msg.data);
         break;
+      case 'kubectl_prep':
+        // 由 onmessage 统一单行刷新，此处兜底
+        terminal.current.write(`\r\x1b[2K\x1b[33m${msg.data}\x1b[0m`);
+        break;
       case 'connected':
-        // Pod 连接成功
+        // Pod 连接成功（主流程在 onmessage 里处理 UI 状态）
         console.log('Pod terminal connected:', msg.data);
         break;
       case 'disconnected':
         terminal.current.writeln(`\r\n\x1b[33m${msg.data}\x1b[0m`);
         break;
       case 'error':
+        setConnecting(false);
         terminal.current.writeln(`\r\n\x1b[31m${msg.data}\x1b[0m`);
         break;
       case 'command_result':
@@ -293,52 +261,57 @@ const { id: clusterId } = useParams<{ id: string }>();
     
     if (terminal.current) {
       terminal.current.clear();
-      terminal.current.writeln('\x1b[33m' + t('kubectl.connecting') + '\x1b[0m');
+      // 不换行，便于后续 kubectl_prep 用 \r 刷新同一行进度
+      terminal.current.write('\x1b[33m' + t('kubectl.connecting') + '\x1b[0m');
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // 使用新的 kubectl Pod 终端（支持 tab 补全）
-    const wsUrl = `${protocol}//${window.location.hostname}:8080/ws/clusters/${clusterId}/kubectl?token=${encodeURIComponent(token)}`;
+    const wsUrl = buildWebSocketUrl(
+      `/ws/clusters/${clusterId}/kubectl?token=${encodeURIComponent(token)}`
+    );
     
     try {
       const ws = new WebSocket(wsUrl);
       websocket.current = ws;
       
       ws.onopen = () => {
-        setConnected(true);
-        setConnecting(false);
-        connectedRef.current = true;
-        message.success(t('messages.connectSuccess'));
-        
-        if (terminal.current) {
-          terminal.current.clear();
-          // Pod Terminal 模式：服务端会自动显示 shell 提示符
-        }
-        
-        // 发送初始终端尺寸
-        if (fitAddon.current && terminal.current) {
-          const dimensions = fitAddon.current.proposeDimensions();
-          if (dimensions) {
-            ws.send(JSON.stringify({
-              type: 'resize',
-              cols: dimensions.cols,
-              rows: dimensions.rows
-            }));
-          }
-        }
+        // WebSocket 已建立；kubectl Pod 可能仍在创建/拉取镜像，等服务端 type=connected 再视为可交互
       };
       
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data);
+          const msg = JSON.parse(event.data) as WebSocketMessage;
+          if (msg.type === 'connected') {
+            setConnected(true);
+            setConnecting(false);
+            connectedRef.current = true;
+            message.success(t('messages.connectSuccess'));
+            if (terminal.current) {
+              terminal.current.clear();
+            }
+            if (fitAddon.current && terminal.current) {
+              const dimensions = fitAddon.current.proposeDimensions();
+              if (dimensions) {
+                ws.send(JSON.stringify({
+                  type: 'resize',
+                  cols: dimensions.cols,
+                  rows: dimensions.rows
+                }));
+              }
+            }
+            return;
+          }
+          if (msg.type === 'kubectl_prep' && terminal.current) {
+            terminal.current.write(`\r\x1b[2K\x1b[33m${msg.data}\x1b[0m`);
+            return;
+          }
           handleWebSocketMessage(msg);
         } catch {
           terminal.current?.write(event.data);
         }
       };
       
-      ws.onerror = (error) => {
-        console.error('WebSocket错误:', error);
+      ws.onerror = (_error) => {
+        console.error('WebSocket错误:', _error);
         message.error(t('messages.connectError'));
         setConnected(false);
         setConnecting(false);
@@ -379,7 +352,6 @@ const { id: clusterId } = useParams<{ id: string }>();
     }
     setConnected(false);
     connectedRef.current = false;
-    currentLineRef.current = '';
     
     if (terminal.current) {
       terminal.current.writeln('\x1b[33m\r\n' + t('messages.disconnected') + '\x1b[0m');
@@ -401,18 +373,6 @@ const { id: clusterId } = useParams<{ id: string }>();
       } else {
         terminalRef.current.requestFullscreen();
       }
-    }
-  };
-
-  // 命名空间变更
-  const handleNamespaceChange = (value: string) => {
-    setSelectedNamespace(value);
-    
-    if (connected && websocket.current && websocket.current.readyState === WebSocket.OPEN) {
-      websocket.current.send(JSON.stringify({
-        type: 'change_namespace',
-        data: value
-      }));
     }
   };
 
@@ -462,66 +422,54 @@ const { id: clusterId } = useParams<{ id: string }>();
           </Text>
         </Space>
         
-        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-          <Col span={4}>
-            <Select
-              placeholder={t("kubectl.selectNamespace")}
-              value={selectedNamespace}
-              onChange={handleNamespaceChange}
-              style={{ width: '100%' }}
-              disabled={connected}
+        <Space style={{ marginTop: 16 }} wrap>
+          {!connected ? (
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={connectTerminal}
+              loading={connecting}
             >
-              {namespaces.map(ns => (
-                <Option key={ns} value={ns}>
-                  {ns}
-                </Option>
-              ))}
-            </Select>
-          </Col>
+              {t('kubectl.connect')}
+            </Button>
+          ) : (
+            <Button
+              danger
+              icon={<StopOutlined />}
+              onClick={disconnectTerminal}
+            >
+              {t('kubectl.disconnect')}
+            </Button>
+          )}
           
-          <Col span={20}>
-            <Space>
-              {!connected ? (
-                <Button
-                  type="primary"
-                  icon={<PlayCircleOutlined />}
-                  onClick={connectTerminal}
-                  loading={connecting}
-                >
-                  {t('kubectl.connect')}
-                </Button>
-              ) : (
-                <Button
-                  danger
-                  icon={<StopOutlined />}
-                  onClick={disconnectTerminal}
-                >
-                  {t('kubectl.disconnect')}
-                </Button>
-              )}
-              
-              <Button
-                icon={<ClearOutlined />}
-                onClick={clearTerminal}
-              >
-                {t('kubectl.clear')}
-              </Button>
-              
-              <Button
-                icon={<FullscreenOutlined />}
-                onClick={toggleFullscreen}
-              >
-                {t('kubectl.fullscreen')}
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+          <Button
+            icon={<ClearOutlined />}
+            onClick={clearTerminal}
+          >
+            {t('kubectl.clear')}
+          </Button>
+          
+          <Button
+            icon={<FullscreenOutlined />}
+            onClick={toggleFullscreen}
+          >
+            {t('kubectl.fullscreen')}
+          </Button>
+        </Space>
       </div>
 
       {/* 连接状态提示 */}
+      {connecting && !connected && (
+        <Alert
+          message={t('kubectl.prepHint')}
+          type="info"
+          showIcon
+          style={{ marginBottom: 16, flexShrink: 0 }}
+        />
+      )}
       {connected && (
         <Alert
-          message={t('kubectl.connectedTo', { clusterId, namespace: selectedNamespace })}
+          message={t('kubectl.connectedTo', { clusterId })}
           type="success"
           showIcon
           style={{ marginBottom: 16, flexShrink: 0 }}

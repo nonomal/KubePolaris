@@ -1,4 +1,5 @@
 import { request } from '../utils/api';
+import { buildWebSocketUrl } from '../utils/wsUrl';
 import type { ApiResponse } from '../types';
 
 export interface ContainerInfo {
@@ -60,31 +61,19 @@ export interface PodInfo {
 }
 
 export interface PodListResponse {
-  code: number;
-  message: string;
-  data: {
-    items: PodInfo[];
-    total: number;
-    page: number;
-    pageSize: number;
-  };
+  items: PodInfo[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface PodDetailResponse {
-  code: number;
-  message: string;
-  data: {
-    pod: PodInfo;
-    raw: Record<string, unknown>;
-  };
+  pod: PodInfo;
+  raw: Record<string, unknown>;
 }
 
 export interface PodLogsResponse {
-  code: number;
-  message: string;
-  data: {
-    logs: string;
-  };
+  logs: string;
 }
 
 export class PodService {
@@ -286,12 +275,12 @@ export class PodService {
   }
 
   // 获取Pod命名空间列表
-  static async getPodNamespaces(clusterId: string): Promise<{ code: number; message: string; data: string[] }> {
+  static async getPodNamespaces(clusterId: string): Promise<string[]> {
     return request.get(`/clusters/${clusterId}/pods/namespaces`);
   }
 
   // 获取Pod节点列表
-  static async getPodNodes(clusterId: string): Promise<{ code: number; message: string; data: string[] }> {
+  static async getPodNodes(clusterId: string): Promise<string[]> {
     return request.get(`/clusters/${clusterId}/pods/nodes`);
   }
 
@@ -307,10 +296,6 @@ export class PodService {
       sinceSeconds?: number;
     } = {}
   ): WebSocket {
-    // 构建WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host.replace(':5173', ':8080'); // 开发环境端口映射
-    
     const params = new URLSearchParams();
     if (options.container) {
       params.append('container', options.container);
@@ -325,7 +310,9 @@ export class PodService {
       params.append('sinceSeconds', options.sinceSeconds.toString());
     }
 
-    const url = `${protocol}//${host}/ws/clusters/${clusterId}/pods/${namespace}/${name}/logs?${params}`;
+    const url = buildWebSocketUrl(
+      `/ws/clusters/${clusterId}/pods/${namespace}/${name}/logs?${params}`
+    );
     
     return new WebSocket(url);
   }

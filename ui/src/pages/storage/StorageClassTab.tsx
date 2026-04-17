@@ -143,12 +143,8 @@ const [allStorageClasses, setAllStorageClasses] = useState<StorageClass[]>([]);
         10000
       );
       
-      if (response.code === 200) {
-        const items = response.data.items || [];
-        setAllStorageClasses(items);
-      } else {
-        message.error(response.message || t('storage:messages.fetchStorageClassError'));
-      }
+      const items = response.items || [];
+      setAllStorageClasses(items);
     } catch (error) {
       console.error('Failed to fetch StorageClass list:', error);
       message.error(t('storage:messages.fetchStorageClassError'));
@@ -217,11 +213,7 @@ const [allStorageClasses, setAllStorageClasses] = useState<StorageClass[]>([]);
         sc.name
       );
       
-      if (response.code === 200) {
-        setCurrentYaml(response.data.yaml);
-      } else {
-        message.error(response.message || t('storage:messages.fetchYAMLError'));
-      }
+      setCurrentYaml(response.yaml);
     } catch (error) {
       console.error('Failed to fetch YAML:', error);
       message.error(t('storage:messages.fetchYAMLError'));
@@ -233,17 +225,13 @@ const [allStorageClasses, setAllStorageClasses] = useState<StorageClass[]>([]);
   // 删除StorageClass
   const handleDelete = async (sc: StorageClass) => {
     try {
-      const response = await StorageService.deleteStorageClass(
+      await StorageService.deleteStorageClass(
         clusterId,
         sc.name
       );
       
-      if (response.code === 200) {
-        message.success(t('common:messages.deleteSuccess'));
-        loadStorageClasses();
-      } else {
-        message.error(response.message || t('storage:messages.deleteError'));
-      }
+      message.success(t('common:messages.deleteSuccess'));
+      loadStorageClasses();
     } catch (error) {
       console.error('Failed to delete:', error);
       message.error(t('common:messages.deleteError'));

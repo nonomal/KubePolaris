@@ -39,7 +39,7 @@ import SystemSettings from './pages/settings/SystemSettings';
 import UserProfile from './pages/profile/UserProfile';
 import Overview from './pages/overview/Overview';
 import { AlertCenter, GlobalAlertCenter } from './pages/alert';
-import { CommandHistory, OperationLogs } from './pages/audit';
+import { CommandHistory, OperationLogs, TerminalReplay } from './pages/audit';
 import { LogCenter, EventLogs } from './pages/logs';
 import ArgoCDConfigPage from './pages/plugins/ArgoCDConfigPage';
 import ArgoCDApplicationsPage from './pages/plugins/ArgoCDApplicationsPage';
@@ -49,6 +49,7 @@ import { MonitoringCenter } from './pages/om';
 import { PermissionProvider } from './contexts/PermissionContext.tsx';
 import { tokenManager } from './services/authService';
 import { PermissionGuard } from './components/PermissionGuard';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 // 认证保护组件
@@ -82,6 +83,7 @@ const AppContent: React.FC = () => {
     <ConfigProvider locale={currentLocale}>
       <AntdApp>
         <Router>
+          <ErrorBoundary>
           <Routes>
             {/* 登录页面 - 不需要认证 */}
             <Route path="/login" element={<Login />} />
@@ -129,8 +131,6 @@ const AppContent: React.FC = () => {
               <Route path="clusters/:clusterId/pods/:namespace/:name" element={<PodDetail />} />
               <Route path="clusters/:clusterId/pods/:namespace/:name/logs" element={<PodLogs />} />
               <Route path="clusters/:clusterId/pods/:namespace/:name/terminal" element={<PodTerminal />} />
-              <Route path="clusters/:clusterId/pods" element={<PodList />} />
-              <Route path="clusters/:clusterId/pods/:namespace/:name" element={<PodDetail />} />
               <Route path="clusters/:clusterId/workloads" element={<WorkloadList />} />
               <Route path="clusters/:clusterId/workloads/create" element={<DeploymentCreate />} />
               <Route path="clusters/:clusterId/workloads/deployment/:namespace/:name" element={<DeploymentDetail />} />
@@ -199,6 +199,11 @@ const AppContent: React.FC = () => {
                   <CommandHistory />
                 </PermissionGuard>
               } />
+              <Route path="audit/terminal/replay/:sessionId" element={
+                <PermissionGuard platformAdminOnly>
+                  <TerminalReplay />
+                </PermissionGuard>
+              } />
               {/* 访问控制路由 - 仅平台管理员 */}
               <Route path="access/users" element={
                 <PermissionGuard platformAdminOnly>
@@ -231,6 +236,7 @@ const AppContent: React.FC = () => {
               <Route path="profile" element={<UserProfile />} />
             </Route>
           </Routes>
+          </ErrorBoundary>
         </Router>
       </AntdApp>
     </ConfigProvider>

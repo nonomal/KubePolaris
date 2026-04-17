@@ -41,8 +41,8 @@ const [form] = Form.useForm();
     const fetchConfig = async () => {
       try {
         const response = await systemSettingService.getSSHConfig();
-        if (response.code === 200) {
-          const config = response.data;
+        {
+          const config = response;
           
           if (config.password === '******') {
             setHasPassword(true);
@@ -79,19 +79,15 @@ const [form] = Form.useForm();
         submitData.private_key = '******';
       }
       
-      const response = await systemSettingService.updateSSHConfig(submitData as SSHConfig);
-      if (response.code === 200) {
-        message.success(t('settings:ssh.saveConfigSuccess'));
-        if (values.password) {
-          setHasPassword(true);
-          form.setFieldValue('password', '');
-        }
-        if (values.private_key) {
-          setHasPrivateKey(true);
-          form.setFieldValue('private_key', '');
-        }
-      } else {
-        message.error(response.message || t('settings:ssh.saveFailed'));
+      await systemSettingService.updateSSHConfig(submitData as SSHConfig);
+      message.success(t('settings:ssh.saveConfigSuccess'));
+      if (values.password) {
+        setHasPassword(true);
+        form.setFieldValue('password', '');
+      }
+      if (values.private_key) {
+        setHasPrivateKey(true);
+        form.setFieldValue('private_key', '');
       }
     } catch (error) {
       message.error(t('settings:ssh.saveConfigFailed'));

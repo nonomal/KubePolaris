@@ -20,6 +20,8 @@ type TerminalSession struct {
 	StartAt    time.Time      `json:"start_at"`
 	EndAt      *time.Time     `json:"end_at"`
 	InputSize  int64          `json:"input_size" gorm:"default:0"`          // 输入流大小（字节）
+	ReplayPath string         `json:"replay_path" gorm:"size:512"`          // 相对 ReplayDir，如 2026-04-17/42.cast.gz
+	ReplaySize int64          `json:"replay_size" gorm:"default:0"`         // gzip 文件字节数
 	Status     string         `json:"status" gorm:"default:active;size:20"` // active, closed, error
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`

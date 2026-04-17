@@ -104,6 +104,14 @@ func (s *AuditService) CloseSession(sessionID uint, status string) error {
 	return nil
 }
 
+// SetSessionReplayReady 会话结束时写入录像相对路径与大小（gzip 后）。
+func (s *AuditService) SetSessionReplayReady(sessionID uint, replayPath string, size int64) error {
+	return s.db.Model(&models.TerminalSession{}).Where("id = ?", sessionID).Updates(map[string]interface{}{
+		"replay_path": replayPath,
+		"replay_size": size,
+	}).Error
+}
+
 // RecordCommand 记录命令（异步调用，不阻塞终端）
 func (s *AuditService) RecordCommand(sessionID uint, rawInput, parsedCmd string, exitCode *int) error {
 	command := &models.TerminalCommand{
@@ -174,6 +182,8 @@ type SessionItem struct {
 	StartAt      time.Time  `json:"start_at"`
 	EndAt        *time.Time `json:"end_at"`
 	InputSize    int64      `json:"input_size"`
+	ReplayPath   string     `json:"replay_path"`
+	ReplaySize   int64      `json:"replay_size"`
 	Status       string     `json:"status"`
 	CommandCount int64      `json:"command_count"`
 }
@@ -284,6 +294,8 @@ func (s *AuditService) GetSessions(req *SessionListRequest) (*SessionListRespons
 			StartAt:      r.StartAt,
 			EndAt:        r.EndAt,
 			InputSize:    r.InputSize,
+			ReplayPath:   r.ReplayPath,
+			ReplaySize:   r.ReplaySize,
 			Status:       r.Status,
 			CommandCount: r.CommandCount,
 		}
@@ -314,6 +326,8 @@ type SessionDetailResponse struct {
 	StartAt      time.Time                `json:"start_at"`
 	EndAt        *time.Time               `json:"end_at"`
 	InputSize    int64                    `json:"input_size"`
+	ReplayPath   string                   `json:"replay_path"`
+	ReplaySize   int64                    `json:"replay_size"`
 	Status       string                   `json:"status"`
 	CommandCount int64                    `json:"command_count"`
 	Duration     string                   `json:"duration"`
@@ -372,6 +386,8 @@ func (s *AuditService) GetSessionDetail(sessionID uint) (*SessionDetailResponse,
 		StartAt:      result.StartAt,
 		EndAt:        result.EndAt,
 		InputSize:    result.InputSize,
+		ReplayPath:   result.ReplayPath,
+		ReplaySize:   result.ReplaySize,
 		Status:       result.Status,
 		CommandCount: commandCount,
 		Duration:     duration,
