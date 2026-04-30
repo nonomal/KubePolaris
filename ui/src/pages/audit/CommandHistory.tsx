@@ -44,6 +44,7 @@ import type {
   SessionStats,
   SessionListParams,
 } from '../../services/auditService';
+import { useNavigate } from 'react-router-dom';
 
 const { RangePicker } = DatePicker;
 const { Text, Paragraph } = Typography;
@@ -63,6 +64,7 @@ const statusConfig: Record<string, { label: string; status: 'processing' | 'succ
 };
 
 const CommandHistory: React.FC = () => {
+  const navigate = useNavigate();
   const { message } = App.useApp();
 
   // 数据状态
@@ -93,9 +95,7 @@ const [sessions, setSessions] = useState<TerminalSessionItem[]>([]);
   const fetchStats = useCallback(async () => {
     try {
       const res = await auditService.getTerminalStats();
-      if (res.code === 200) {
-        setStats(res.data);
-      }
+      setStats(res);
     } catch (error) {
       console.error('获取统计信息失败', error);
     }
@@ -118,10 +118,8 @@ const [sessions, setSessions] = useState<TerminalSessionItem[]>([]);
       }
 
       const res = await auditService.getTerminalSessions(params);
-      if (res.code === 200) {
-        setSessions(res.data.items || []);
-        setTotal(res.data.total);
-      }
+      setSessions(res.items || []);
+      setTotal(res.total);
     } catch {
       message.error(t('audit:commands.fetchFailed'));
     } finally {
@@ -138,13 +136,9 @@ const [sessions, setSessions] = useState<TerminalSessionItem[]>([]);
         auditService.getTerminalCommands(sessionId, { pageSize: 500 }),
       ]);
 
-      if (sessionRes.code === 200) {
-        setSelectedSession(sessionRes.data);
-      }
-      if (commandsRes.code === 200) {
-        setCommands(commandsRes.data.items || []);
-        setCommandsTotal(commandsRes.data.total);
-      }
+      setSelectedSession(sessionRes);
+      setCommands(commandsRes.items || []);
+      setCommandsTotal(commandsRes.total);
     } catch {
       message.error(t('commands.fetchDetailFailed'));
     } finally {
@@ -275,17 +269,28 @@ const [sessions, setSessions] = useState<TerminalSessionItem[]>([]);
     {
       title: t('common:table.actions'),
       key: 'action',
-      width: 100,
+      width: 160,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<HistoryOutlined />}
-          onClick={() => handleViewCommands(record)}
-        >
-          {t('audit:commands.viewBtn')}
-        </Button>
+        <Space size={0}>
+          <Button
+            type="link"
+            size="small"
+            icon={<HistoryOutlined />}
+            onClick={() => handleViewCommands(record)}
+          >
+            {t('audit:commands.viewBtn')}
+          </Button>
+          {record.replay_size > 0 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => navigate(`/audit/terminal/replay/${record.id}`)}
+            >
+              回放
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];

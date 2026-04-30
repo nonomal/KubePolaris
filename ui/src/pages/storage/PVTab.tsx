@@ -144,12 +144,8 @@ const [allPVs, setAllPVs] = useState<PV[]>([]);
         10000
       );
       
-      if (response.code === 200) {
-        const items = response.data.items || [];
-        setAllPVs(items);
-      } else {
-        message.error(response.message || t('storage:messages.fetchPVError'));
-      }
+      const items = response.items || [];
+      setAllPVs(items);
     } catch (error) {
       console.error('Failed to fetch PV list:', error);
       message.error(t('storage:messages.fetchPVError'));
@@ -218,11 +214,7 @@ const [allPVs, setAllPVs] = useState<PV[]>([]);
         pv.name
       );
       
-      if (response.code === 200) {
-        setCurrentYaml(response.data.yaml);
-      } else {
-        message.error(response.message || t('storage:messages.fetchYAMLError'));
-      }
+      setCurrentYaml(response.yaml);
     } catch (error) {
       console.error('Failed to fetch YAML:', error);
       message.error(t('storage:messages.fetchYAMLError'));
@@ -234,17 +226,13 @@ const [allPVs, setAllPVs] = useState<PV[]>([]);
   // 删除PV
   const handleDelete = async (pv: PV) => {
     try {
-      const response = await StorageService.deletePV(
+      await StorageService.deletePV(
         clusterId,
         pv.name
       );
       
-      if (response.code === 200) {
-        message.success(t('common:messages.deleteSuccess'));
-        loadPVs();
-      } else {
-        message.error(response.message || t('storage:messages.deleteError'));
-      }
+      message.success(t('common:messages.deleteSuccess'));
+      loadPVs();
     } catch (error) {
       console.error('Failed to delete:', error);
       message.error(t('common:messages.deleteError'));

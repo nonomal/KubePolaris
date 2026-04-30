@@ -82,6 +82,18 @@ spec:
           value: "24"
         - name: LOG_LEVEL
           value: {{ .Values.config.log.level | quote }}
+        - name: ARTHAS_ENABLED
+          value: {{ .Values.backend.arthas.enabled | quote }}
+        - name: ARTHAS_PACKAGE_SOURCE
+          value: {{ .Values.backend.arthas.packageSource | quote }}
+        - name: ARTHAS_PACKAGE_URL
+          value: {{ .Values.backend.arthas.packageUrl | quote }}
+        - name: ARTHAS_AUTO_EXEC_LOW_RISK
+          value: {{ .Values.backend.arthas.autoExecLowRisk | quote }}
+        - name: ARTHAS_SESSION_TIMEOUT
+          value: {{ .Values.backend.arthas.sessionTimeout | quote }}
+        - name: ARTHAS_MAX_OUTPUT_BYTES
+          value: {{ .Values.backend.arthas.maxOutputBytes | quote }}
         - name: TZ
           value: "Asia/Shanghai"
         {{- with .Values.backend.env }}

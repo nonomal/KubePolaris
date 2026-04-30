@@ -97,6 +97,7 @@ export const ACTION_PERMISSIONS: Record<string, PermissionType> = {
   'pod:delete': 'dev',
   'pod:exec': 'dev',
   'pod:logs': 'readonly',
+  'pod:arthas': 'dev',
   
   // 工作负载操作
   'deployment:create': 'dev',

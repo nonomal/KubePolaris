@@ -20,6 +20,14 @@ backend:
       cpu: 1000m
       memory: 1Gi
 
+  arthas:
+    enabled: true
+    packageSource: "url"
+    packageUrl: "https://arthas.aliyun.com/arthas-boot.jar"
+    autoExecLowRisk: true
+    sessionTimeout: 30
+    maxOutputBytes: 1048576
+
   # Pod 反亲和性 - 确保 Pod 分散到不同节点
   affinity:
     podAntiAffinity:

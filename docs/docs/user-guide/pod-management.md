@@ -123,6 +123,20 @@ ps aux
 
 详细说明请参考 [终端访问](./terminal-access)。
 
+## Java 诊断（Arthas Agent）
+
+对于运行中的 Java Pod，可以在 Pod 详情页点击 **Java 诊断** 进入 Arthas Agent 页面。
+
+第一版能力：
+
+- 自动探测目标容器中的 Java 进程和 Arthas 启动器
+- 使用自然语言描述问题，例如“CPU 使用率很高，帮我查查”
+- Agent 自动生成诊断计划，并自动执行低风险只读命令
+- `ognl`、`heapdump`、`redefine`、未限量 `watch/trace` 等高风险命令需要确认后执行
+- 诊断过程、命令和输出会进入终端审计链路
+
+如果 Java 镜像中没有预置 `as.sh` 或 `arthas-boot.jar`，平台会在首次执行诊断命令时按 `ARTHAS_PACKAGE_URL` 下载到目标容器的 `/tmp/arthas/arthas-boot.jar`。目标容器需要具备 `curl` 或 `wget`，并能访问该下载地址。
+
 ## Pod 操作
 
 ### 删除 Pod

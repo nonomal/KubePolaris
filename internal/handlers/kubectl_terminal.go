@@ -13,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/clay-wangzhi/KubePolaris/internal/middleware"
 	"github.com/clay-wangzhi/KubePolaris/internal/models"
+	"github.com/clay-wangzhi/KubePolaris/internal/response"
 	"github.com/clay-wangzhi/KubePolaris/internal/services"
 	"github.com/clay-wangzhi/KubePolaris/pkg/logger"
 
@@ -60,7 +62,11 @@ func NewKubectlTerminalHandler(clusterService *services.ClusterService, auditSer
 		auditService:   auditService,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // 在生产环境中应该检查Origin
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return true
+				}
+				return middleware.IsRequestOriginAllowed(origin, r.Host)
 			},
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -79,7 +85,7 @@ func (h *KubectlTerminalHandler) HandleKubectlTerminal(c *gin.Context) {
 	// 获取集群信息
 	cluster, err := h.clusterService.GetCluster(uint(mustParseUint(clusterID)))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "集群不存在"})
+		response.NotFound(c, "集群不存在")
 		return
 	}
 
@@ -299,7 +305,7 @@ func (h *KubectlTerminalHandler) executeKubectlCommand(session *KubectlSession, 
 	}
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "kubectl", kubectlArgs...)
+	cmd := exec.CommandContext(ctx, "kubectl", kubectlArgs...) // #nosec G204 -- kubectl 参数经过白名单校验
 
 	// 设置环境变量
 	cmd.Env = append(os.Environ(),
@@ -569,7 +575,7 @@ func (h *KubectlTerminalHandler) handleInterrupt(session *KubectlSession) {
 
 		// 在Windows上，Kill()可能不会立即终止进程，尝试使用taskkill
 		if runtime.GOOS == "windows" {
-			_ = exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid)).Run()
+			_ = exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid)).Run() // #nosec G204 -- PID 来自已知进程
 		} else {
 			// 在Unix系统上，发送SIGINT信号（等同于Ctrl+C）
 			_ = cmd.Process.Signal(syscall.SIGINT)

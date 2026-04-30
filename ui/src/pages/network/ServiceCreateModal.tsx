@@ -85,23 +85,18 @@ spec:
     try {
       if (activeTab === 'yaml') {
         // YAML方式创建
-        const response = await ServiceService.createService(clusterId, {
-          namespace: 'default', // 从YAML中解析
+        await ServiceService.createService(clusterId, {
+          namespace: 'default',
           yaml: yamlContent,
         });
         
-        if (response.code === 200) {
-          message.success(t('network:create.serviceSuccess'));
-          onSuccess();
-          onClose();
-        } else {
-          message.error(response.message || t('network:create.serviceFailed'));
-        }
+        message.success(t('network:create.serviceSuccess'));
+        onSuccess();
+        onClose();
       } else {
-        // 表单方式创建
         const values = await form.validateFields();
         
-        const response = await ServiceService.createService(clusterId, {
+        await ServiceService.createService(clusterId, {
           namespace: values.namespace,
           formData: {
             name: values.name,
@@ -129,14 +124,10 @@ spec:
           },
         });
         
-        if (response.code === 200) {
-          message.success(t('network:create.serviceSuccess'));
-          form.resetFields();
-          onSuccess();
-          onClose();
-        } else {
-          message.error(response.message || t('network:create.serviceFailed'));
-        }
+        message.success(t('network:create.serviceSuccess'));
+        form.resetFields();
+        onSuccess();
+        onClose();
       }
     } catch (error: unknown) {
       console.error('Failed to create Service:', error);

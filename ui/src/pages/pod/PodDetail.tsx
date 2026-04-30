@@ -25,6 +25,7 @@ import {
   FileTextOutlined,
   ConsoleSqlOutlined,
   LineChartOutlined,
+  BugOutlined,
 } from '@ant-design/icons';
 import { PodService } from '../../services/podService';
 import { clusterService } from '../../services/clusterService';
@@ -61,12 +62,8 @@ const PodDetail: React.FC<PodDetailProps> = () => {
     try {
       const response = await PodService.getPodDetail(clusterId, namespace, name);
       
-      if (response.code === 200) {
-        setPod(response.data.pod);
-        setRawPod(response.data.raw);
-      } else {
-        message.error(response.message || t('detail.fetchError'));
-      }
+      setPod(response.pod);
+      setRawPod(response.raw);
     } catch (error) {
       console.error('Failed to fetch pod details:', error);
       message.error(t('detail.fetchError'));
@@ -80,14 +77,9 @@ const PodDetail: React.FC<PodDetailProps> = () => {
     if (!clusterId || !namespace || !name) return;
     
     try {
-      const response = await PodService.deletePod(clusterId, namespace, name);
-      
-      if (response.code === 200) {
-        message.success(tc('messages.deleteSuccess'));
-        navigate(`/clusters/${clusterId}/pods`);
-      } else {
-        message.error(response.message || tc('messages.deleteError'));
-      }
+      await PodService.deletePod(clusterId, namespace, name);
+      message.success(tc('messages.deleteSuccess'));
+      navigate(`/clusters/${clusterId}/pods`);
     } catch (error) {
       console.error('Failed to delete pod:', error);
       message.error(tc('messages.deleteError'));
@@ -104,6 +96,11 @@ const PodDetail: React.FC<PodDetailProps> = () => {
     window.open(`/clusters/${clusterId}/pods/${namespace}/${name}/terminal`, '_blank');
   };
 
+  // Java 运行时诊断
+  const handleArthas = () => {
+    navigate(`/clusters/${clusterId}/pods/${namespace}/${name}/arthas`);
+  };
+
   useEffect(() => {
     fetchPodDetail();
   }, [fetchPodDetail]);
@@ -114,8 +111,8 @@ const PodDetail: React.FC<PodDetailProps> = () => {
       if (!clusterId) return;
       try {
         const response = await clusterService.getCluster(clusterId);
-        if (response.code === 200 && response.data) {
-          setClusterName(response.data.name);
+        if (response) {
+          setClusterName(response.name);
         }
       } catch (error) {
         console.error('Failed to fetch cluster info:', error);
@@ -266,6 +263,14 @@ const PodDetail: React.FC<PodDetailProps> = () => {
               disabled={pod.status !== 'Running'}
             >
               {t('actions.terminal')}
+            </Button>
+
+            <Button
+              icon={<BugOutlined />}
+              onClick={handleArthas}
+              disabled={pod.status !== 'Running'}
+            >
+              {t('actions.arthas')}
             </Button>
             
             <Popconfirm

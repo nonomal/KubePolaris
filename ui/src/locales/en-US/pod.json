@@ -43,6 +43,7 @@
     "logs": "Logs",
     "login": "Login",
     "terminal": "Terminal",
+    "arthas": "Java Diagnostics",
     "delete": "Delete",
     "batchDelete": "Batch Delete",
     "confirmBatchDelete": "Confirm Batch Delete",

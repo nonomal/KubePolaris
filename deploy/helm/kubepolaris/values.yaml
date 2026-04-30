@@ -67,6 +67,15 @@ backend:
   env: []
   # - name: LOG_LEVEL
   #   value: "info"
+
+  # Arthas Agent（Java Pod 在线诊断）
+  arthas:
+    enabled: true
+    packageSource: "url"
+    packageUrl: "https://arthas.aliyun.com/arthas-boot.jar"
+    autoExecLowRisk: true
+    sessionTimeout: 30
+    maxOutputBytes: 1048576
   
   # 从 Secret 加载环境变量
   envFrom: []

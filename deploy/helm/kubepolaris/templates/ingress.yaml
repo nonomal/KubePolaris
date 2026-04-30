@@ -12,7 +12,7 @@ metadata:
     # WebSocket 支持（终端功能需要）
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/websocket-services: "{{ include "kubepolaris.fullname" . }}-backend"
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include "kubepolaris.fullname" $ }}-backend"
   {{- end }}
 spec:
   {{- if .Values.ingress.className }}

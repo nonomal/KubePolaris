@@ -344,6 +344,8 @@ DB_DRIVER=sqlite
 DB_DSN=./data/kubepolaris.db
 JWT_SECRET=dev-secret-key
 LOG_LEVEL=debug
+ARTHAS_ENABLED=true
+ARTHAS_AUTO_EXEC_LOW_RISK=true
 ```
 
 ### 生产环境
@@ -362,7 +364,26 @@ DB_DATABASE=kubepolaris
 JWT_SECRET=your-very-secure-jwt-secret-key-at-least-32-chars
 JWT_EXPIRE_TIME=24
 LOG_LEVEL=info
+ARTHAS_ENABLED=true
+ARTHAS_PACKAGE_SOURCE=url
+ARTHAS_PACKAGE_URL=https://arthas.aliyun.com/arthas-boot.jar
+ARTHAS_AUTO_EXEC_LOW_RISK=true
+ARTHAS_SESSION_TIMEOUT=30
+ARTHAS_MAX_OUTPUT_BYTES=1048576
 ```
+
+### Arthas Agent 配置
+
+Arthas Agent 用于 Java Pod 在线诊断。第一版默认只自动执行低风险只读命令，高风险命令需要用户确认。
+
+| 环境变量 | 默认值 | 说明 |
+|----------|--------|------|
+| `ARTHAS_ENABLED` | `true` | 是否启用 Arthas Agent |
+| `ARTHAS_PACKAGE_SOURCE` | `url` | Arthas 包来源；`url` 表示首次诊断时下载到目标容器 `/tmp/arthas` |
+| `ARTHAS_PACKAGE_URL` | `https://arthas.aliyun.com/arthas-boot.jar` | 可信 arthas-boot.jar 下载地址 |
+| `ARTHAS_AUTO_EXEC_LOW_RISK` | `true` | 是否允许自动执行低风险只读命令 |
+| `ARTHAS_SESSION_TIMEOUT` | `30` | 单次诊断命令超时时间，单位秒 |
+| `ARTHAS_MAX_OUTPUT_BYTES` | `1048576` | 单次命令输出上限 |
 
 ## 下一步
 

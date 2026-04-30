@@ -23,6 +23,14 @@ backend:
       cpu: 500m
       memory: 512Mi
 
+  arthas:
+    enabled: true
+    packageSource: "url"
+    packageUrl: "https://arthas.aliyun.com/arthas-boot.jar"
+    autoExecLowRisk: true
+    sessionTimeout: 30
+    maxOutputBytes: 1048576
+
 # 前端配置
 frontend:
   replicaCount: 2

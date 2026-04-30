@@ -95,7 +95,7 @@ func initSQLite(cfg config.DatabaseConfig, gormConfig *gorm.Config) (*gorm.DB, e
 	// 确保目录存在
 	dir := filepath.Dir(dbPath)
 	if dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return nil, fmt.Errorf("创建数据库目录失败: %w", err)
 		}
 	}
@@ -286,8 +286,10 @@ func createDefaultUser(db *gorm.DB) {
 		} else {
 			logger.Info("默认管理员用户创建成功: admin/KubePolaris@2026")
 		}
-	} else {
+	} else if result.Error != nil {
 		logger.Error("查询默认用户失败: %v", result.Error)
+	} else {
+		logger.Info("默认管理员用户已存在，跳过创建")
 	}
 }
 

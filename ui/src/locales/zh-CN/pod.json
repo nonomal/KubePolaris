@@ -43,6 +43,7 @@
     "logs": "日志",
     "login": "登录",
     "terminal": "登录终端",
+    "arthas": "Java 诊断",
     "delete": "删除",
     "batchDelete": "批量删除",
     "confirmBatchDelete": "确认批量删除",

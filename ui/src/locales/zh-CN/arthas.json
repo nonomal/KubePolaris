@@ -1,0 +1,41 @@
+{
+  "title": "Arthas Java 诊断",
+  "status": {
+    "connected": "已连接",
+    "disconnected": "未连接"
+  },
+  "target": {
+    "title": "诊断目标",
+    "pidPlaceholder": "请选择 Java PID",
+    "noStatus": "暂无探测结果",
+    "launcher": "启动器"
+  },
+  "ask": {
+    "title": "自然语言问诊",
+    "placeholder": "例如：现在 CPU 使用率很高，帮我查查是哪个线程导致的",
+    "submit": "开始诊断"
+  },
+  "timeline": {
+    "title": "诊断过程",
+    "empty": "输入问题后，Agent 会生成诊断计划并执行低风险命令",
+    "connected": "连接成功",
+    "userPrompt": "用户问题",
+    "confirmRequired": "需要确认",
+    "commandResult": "命令结果",
+    "report": "诊断结论",
+    "possibleCauses": "可能原因",
+    "recommendations": "建议",
+    "done": "诊断完成",
+    "error": "执行错误"
+  },
+  "confirm": {
+    "title": "确认执行 Arthas 命令",
+    "warning": "该命令可能读取敏感数据、产生较大输出或增加运行时开销，请确认后执行。",
+    "ok": "确认执行",
+    "remaining": "还有 {{count}} 条待确认命令"
+  },
+  "messages": {
+    "noToken": "登录已失效，请重新登录",
+    "wsError": "Arthas WebSocket 连接异常"
+  }
+}

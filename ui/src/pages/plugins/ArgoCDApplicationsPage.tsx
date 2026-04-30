@@ -69,7 +69,7 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
     try {
       setConfigLoading(true);
       const response = await argoCDService.getConfig(clusterId);
-      setConfigEnabled(response.data?.enabled || false);
+      setConfigEnabled(response?.enabled || false);
     } catch (error) {
       console.error('加载配置失败:', error);
       setConfigEnabled(false);
@@ -84,9 +84,7 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
     setLoading(true);
     try {
       const response = await argoCDService.listApplications(clusterId);
-      if (response.code === 200) {
-        setApplications(response.data.items || []);
-      }
+      setApplications(response.items || []);
     } catch (error: unknown) {
       console.error('加载应用列表失败:', error);
     } finally {
@@ -124,15 +122,11 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
         helm_values: values.helm_values,
       };
       
-      const response = await argoCDService.createApplication(clusterId!, req);
-      if (response.code === 200) {
-        message.success(t('plugins:argocd.createSuccess'));
-        setCreateModalVisible(false);
-        form.resetFields();
-        loadApplications();
-      } else {
-        message.error(response.message || t('plugins:argocd.createFailed'));
-      }
+      await argoCDService.createApplication(clusterId!, req);
+      message.success(t('plugins:argocd.createSuccess'));
+      setCreateModalVisible(false);
+      form.resetFields();
+      loadApplications();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : t('plugins:argocd.createFailed');
       message.error(errorMessage);
@@ -145,13 +139,9 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
   const handleSync = async (appName: string) => {
     try {
       message.loading({ content: t('plugins:argocd.syncing'), key: 'sync' });
-      const response = await argoCDService.syncApplication(clusterId!, appName);
-      if (response.code === 200) {
-        message.success({ content: t('plugins:argocd.syncTriggered'), key: 'sync' });
-        loadApplications();
-      } else {
-        message.error({ content: response.message || t('plugins:argocd.syncFailed'), key: 'sync' });
-      }
+      await argoCDService.syncApplication(clusterId!, appName);
+      message.success({ content: t('plugins:argocd.syncTriggered'), key: 'sync' });
+      loadApplications();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : t('plugins:argocd.syncFailed');
       message.error({ content: errorMessage, key: 'sync' });
@@ -162,13 +152,9 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
   const handleDelete = async (appName: string) => {
     try {
       message.loading({ content: t('plugins:argocd.deleting'), key: 'delete' });
-      const response = await argoCDService.deleteApplication(clusterId!, appName, true);
-      if (response.code === 200) {
-        message.success({ content: t('plugins:argocd.deleteSuccess'), key: 'delete' });
-        loadApplications();
-      } else {
-        message.error({ content: response.message || t('plugins:argocd.deleteFailed'), key: 'delete' });
-      }
+      await argoCDService.deleteApplication(clusterId!, appName, true);
+      message.success({ content: t('plugins:argocd.deleteSuccess'), key: 'delete' });
+      loadApplications();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : t('plugins:argocd.deleteFailed');
       message.error({ content: errorMessage, key: 'delete' });
@@ -185,14 +171,10 @@ const [applications, setApplications] = useState<ArgoCDApplication[]>([]);
   const handleRollback = async (appName: string, revisionId: number) => {
     try {
       message.loading({ content: t('plugins:argocd.rolling'), key: 'rollback' });
-      const response = await argoCDService.rollbackApplication(clusterId!, appName, { revision_id: revisionId });
-      if (response.code === 200) {
-        message.success({ content: t('plugins:argocd.rollbackSuccess'), key: 'rollback' });
-        loadApplications();
-        setDetailDrawerVisible(false);
-      } else {
-        message.error({ content: response.message || t('plugins:argocd.rollbackFailed'), key: 'rollback' });
-      }
+      await argoCDService.rollbackApplication(clusterId!, appName, { revision_id: revisionId });
+      message.success({ content: t('plugins:argocd.rollbackSuccess'), key: 'rollback' });
+      loadApplications();
+      setDetailDrawerVisible(false);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : t('plugins:argocd.rollbackFailed');
       message.error({ content: errorMessage, key: 'rollback' });

@@ -1,0 +1,41 @@
+{
+  "title": "Arthas Java Diagnostics",
+  "status": {
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "target": {
+    "title": "Target",
+    "pidPlaceholder": "Select Java PID",
+    "noStatus": "No probe result",
+    "launcher": "Launcher"
+  },
+  "ask": {
+    "title": "Ask Agent",
+    "placeholder": "Example: CPU usage is high, help me find the hot thread",
+    "submit": "Start Diagnosis"
+  },
+  "timeline": {
+    "title": "Diagnosis Timeline",
+    "empty": "Ask a question and the Agent will plan diagnosis and execute low-risk commands.",
+    "connected": "Connected",
+    "userPrompt": "User Prompt",
+    "confirmRequired": "Confirmation Required",
+    "commandResult": "Command Result",
+    "report": "Diagnosis Report",
+    "possibleCauses": "Possible Causes",
+    "recommendations": "Recommendations",
+    "done": "Diagnosis Completed",
+    "error": "Execution Error"
+  },
+  "confirm": {
+    "title": "Confirm Arthas Command",
+    "warning": "This command may read sensitive data, produce large output, or add runtime overhead. Confirm before execution.",
+    "ok": "Confirm",
+    "remaining": "{{count}} pending confirmations remaining"
+  },
+  "messages": {
+    "noToken": "Login expired, please sign in again",
+    "wsError": "Arthas WebSocket connection error"
+  }
+}
